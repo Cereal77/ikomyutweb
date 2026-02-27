@@ -23,17 +23,17 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
 
+
   const login = async (email: string, password: string) => {
-    
     await new Promise(resolve => setTimeout(resolve, 500));
-    
     if (!email || !password) {
       throw new Error('Email and password are required');
     }
-
+    // This should be replaced by real backend login
     const newUser: User = {
       id: '1',
       email,
+      fullName: '',
       name: email.split('@')[0],
     };
     setUser(newUser);
@@ -41,20 +41,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const register = async (name: string, email: string, password: string) => {
-  
     await new Promise(resolve => setTimeout(resolve, 500));
-
     if (!name || !email || !password) {
       throw new Error('All fields are required');
     }
-
     if (password.length < 6) {
       throw new Error('Password must be at least 6 characters');
     }
-
     const newUser: User = {
       id: '1',
       email,
+      fullName: name,
       name,
     };
     setUser(newUser);
@@ -68,11 +65,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const setUserFromBackend = (userData: User) => {
-    setUser(userData);
-    if (userData.token) {
-      localStorage.setItem('token', userData.token);
+    // Always ensure fullName and email are set for autofill
+    const safeUser: User = {
+      ...userData,
+      fullName: userData.fullName || userData.name || '',
+      email: userData.email || '',
+    };
+    setUser(safeUser);
+    if (safeUser.token) {
+      localStorage.setItem('token', safeUser.token);
     }
-    localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('user', JSON.stringify(safeUser));
   };
 
   React.useEffect(() => {

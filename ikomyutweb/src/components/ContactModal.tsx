@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import '../styles/ContactModal.css';
 
 interface ContactModalProps {
@@ -7,6 +8,7 @@ interface ContactModalProps {
 }
 
 const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
+  const { user, isLoggedIn } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -16,7 +18,17 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
-  const [verificationSent, setVerificationSent] = useState(false);
+
+  // Pre-fill form with user data if logged in
+  useEffect(() => {
+    if (isLoggedIn && user) {
+      setFormData((prev) => ({
+        ...prev,
+        name: user.fullName || user.name || '',
+        email: user.email || '',
+      }));
+    }
+  }, [isLoggedIn, user, isOpen]);
 
   if (!isOpen) return null;
 
@@ -67,13 +79,13 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
         throw new Error(errorMsg);
       }
 
-      setVerificationSent(true);
+      setSuccess(true);
 
       setTimeout(() => {
-        setVerificationSent(false);
+        setSuccess(false);
         setFormData({ name: '', email: '', message: '' });
         onClose();
-      }, 3000);
+      }, 2500);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send message');
       setLoading(false);
@@ -100,14 +112,6 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
             <div className="success-icon">✓</div>
             <p>Thank you! Your message has been sent successfully.</p>
           </div>
-        ) : verificationSent ? (
-          <div className="contact-success" style={{ background: '#e8f5e9', borderRadius: '8px', padding: '24px', textAlign: 'center' }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>📧</div>
-            <h3 style={{ margin: '0 0 12px', color: '#2e7d32' }}>Check Your Email</h3>
-            <p style={{ margin: '0 0 12px', color: '#555' }}>We sent a verification email to:</p>
-            <p style={{ margin: '0 0 20px', color: '#2e7d32', fontWeight: 'bold' }}>{formData.email}</p>
-            <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>Please click the link in the email to verify your message and let us know you received it.</p>
-          </div>
         ) : (
           <form onSubmit={handleSubmit} className="contact-form">
             {error && (
@@ -125,7 +129,7 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
                 onChange={handleChange}
                 placeholder="Your name"
                 required
-                disabled={loading}
+                disabled={loading || (isLoggedIn && !!formData.name)}
               />
             </div>
 
@@ -138,7 +142,7 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
                 onChange={handleChange}
                 placeholder="Email"
                 required
-                disabled={loading}
+                disabled={loading || (isLoggedIn && !!formData.email)}
               />
             </div>
 
