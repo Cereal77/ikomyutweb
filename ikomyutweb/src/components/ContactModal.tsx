@@ -22,11 +22,21 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
   // Pre-fill form with user data if logged in
   useEffect(() => {
     if (isLoggedIn && user) {
-      setFormData((prev) => ({
-        ...prev,
-        name: user.fullName || user.name || '',
-        email: user.email || '',
-      }));
+      console.log('AutoFill Debug - User object:', user);
+      const fullName = user.fullName || user.name || '';
+      const userEmail = user.email || '';
+      console.log('AutoFill Debug - fullName:', fullName, 'email:', userEmail);
+      
+      setFormData({
+        name: fullName,
+        email: userEmail,
+        message: '',
+      });
+    } else {
+      // Reset form when modal closes or user logs out
+      if (!isOpen) {
+        setFormData({ name: '', email: '', message: '' });
+      }
     }
   }, [isLoggedIn, user, isOpen]);
 

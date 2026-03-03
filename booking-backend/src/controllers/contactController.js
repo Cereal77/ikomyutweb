@@ -27,7 +27,9 @@ const isValidEmail = (email) => {
 
 // Create Nodemailer transporter with Gmail
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false,
   auth: {
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_APP_PASSWORD,
@@ -37,9 +39,14 @@ const transporter = nodemailer.createTransport({
 // Verify transporter connection
 transporter.verify((error, success) => {
   if (error) {
-    console.error('Gmail transporter error:', error);
+    console.error('✗ Gmail transporter FAILED:', {
+      error: error.message,
+      code: error.code,
+      user: process.env.GMAIL_USER,
+      hasPassword: !!process.env.GMAIL_APP_PASSWORD,
+    });
   } else {
-    console.log('Gmail transporter ready:', success);
+    console.log('✓ Gmail transporter ready and verified');
   }
 });
 
@@ -48,13 +55,19 @@ exports.sendContactEmail = async (req, res) => {
   try {
     const { name, email, message } = req.body;
 
+    console.log('=== Contact Email Received ===');
+    console.log('From:', name, 'Email:', email);
+    console.log('Message:', message.substring(0, 50) + '...');
+
     // Validation
     if (!name || !email || !message) {
+      console.log('Validation failed: Missing fields');
       return res.status(400).json({ message: 'All fields are required' });
     }
 
     // Validate email format
     if (!isValidEmail(email)) {
+      console.log('Validation failed: Invalid email format -', email);
       return res.status(400).json({ message: 'Please enter a valid email address' });
     }
 
@@ -66,7 +79,7 @@ exports.sendContactEmail = async (req, res) => {
       isVerified: true,
     });
 
-    console.log('Contact saved to database:', contact._id);
+    console.log('✓ Contact saved to database:', contact._id);
 
     // Send confirmation email to user
     const userMailOptions = {
@@ -82,14 +95,19 @@ exports.sendContactEmail = async (req, res) => {
       `,
     };
 
-    // Send confirmation email to user (fire and forget, don't wait)
-    transporter.sendMail(userMailOptions, (err, info) => {
-      if (err) {
-        console.error('Failed to send confirmation email to user:', err.message);
-      } else {
-        console.log('Confirmation email sent to user:', info.response);
-      }
-    });
+    // Send confirmation email to user - WAIT for result
+    console.log('📧 Attempting to send confirmation email to:', email);
+    try {
+      const userInfo = await transporter.sendMail(userMailOptions);
+      console.log('✓ Confirmation email sent successfully:', userInfo.response);
+    } catch (userEmailError) {
+      console.error('✗ User email failed:', {
+        to: email,
+        error: userEmailError.message,
+        code: userEmailError.code,
+      });
+      // Don't stop - try to send admin email even if user email fails
+    }
 
     // Send admin notification email
     const adminMailOptions = {
@@ -105,22 +123,30 @@ exports.sendContactEmail = async (req, res) => {
       `,
     };
 
-    // Send admin notification email (fire and forget, don't wait)
-    transporter.sendMail(adminMailOptions, (err, info) => {
-      if (err) {
-        console.error('Failed to send admin notification:', err.message);
-      } else {
-        console.log('Admin notification sent:', info.response);
-      }
-    });
+    // Send admin notification email - WAIT for result
+    console.log('📧 Attempting to send admin notification to:', process.env.GMAIL_USER);
+    try {
+      const adminInfo = await transporter.sendMail(adminMailOptions);
+      console.log('✓ Admin notification sent successfully:', adminInfo.response);
+    } catch (adminEmailError) {
+      console.error('✗ Admin email failed:', {
+        to: process.env.GMAIL_USER,
+        error: adminEmailError.message,
+        code: adminEmailError.code,
+      });
+    }
 
-    // Return success immediately
+    // Return success to client
+    console.log('=== Contact Email Process Completed ===');
     res.status(200).json({
       message: 'Thank you! Your message has been received. We will get back to you soon.',
       status: 'ok',
     });
   } catch (error) {
-    console.error('Error:', error.message);
+    console.error('✗ Error in sendContactEmail:', {
+      message: error.message,
+      stack: error.stack,
+    });
     res.status(500).json({
       message: 'Failed to process your message. Please try again later.',
       error: error.message,
