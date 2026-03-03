@@ -106,34 +106,7 @@ exports.sendContactEmail = async (req, res) => {
         error: userEmailError.message,
         code: userEmailError.code,
       });
-      // Don't stop - try to send admin email even if user email fails
-    }
-
-    // Send admin notification email
-    const adminMailOptions = {
-      from: process.env.GMAIL_USER,
-      to: process.env.GMAIL_USER,
-      subject: `New Message from ${name}`,
-      html: `
-        <h2>New Contact Message</h2>
-        <p><strong>From:</strong> ${name}</p>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Message:</strong></p>
-        <p>${message.replace(/\n/g, '<br>')}</p>
-      `,
-    };
-
-    // Send admin notification email - WAIT for result
-    console.log('📧 Attempting to send admin notification to:', process.env.GMAIL_USER);
-    try {
-      const adminInfo = await transporter.sendMail(adminMailOptions);
-      console.log('✓ Admin notification sent successfully:', adminInfo.response);
-    } catch (adminEmailError) {
-      console.error('✗ Admin email failed:', {
-        to: process.env.GMAIL_USER,
-        error: adminEmailError.message,
-        code: adminEmailError.code,
-      });
+      // Don't stop - message is already saved to database
     }
 
     // Return success to client
