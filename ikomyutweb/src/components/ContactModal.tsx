@@ -19,21 +19,36 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
-  // Pre-fill form with user data if logged in
+  // Pre-fill form with user data if logged in or from registration
   useEffect(() => {
     if (isLoggedIn && user) {
-      console.log('AutoFill Debug - User object:', user);
       const fullName = user.fullName || user.name || '';
       const userEmail = user.email || '';
-      console.log('AutoFill Debug - fullName:', fullName, 'email:', userEmail);
       
       setFormData({
         name: fullName,
         email: userEmail,
         message: '',
       });
+    } else if (isOpen) {
+      // Check if there's a recently registered user in localStorage
+      const registeredUser = localStorage.getItem('registeredUser');
+      if (registeredUser) {
+        try {
+          const userData = JSON.parse(registeredUser);
+          setFormData({
+            name: userData.fullName || '',
+            email: userData.email || '',
+            message: '',
+          });
+        } catch (e) {
+          console.error('Failed to parse registered user:', e);
+        }
+      } else {
+        setFormData({ name: '', email: '', message: '' });
+      }
     } else {
-      // Reset form when modal closes or user logs out
+      // Reset form when modal closes
       if (!isOpen) {
         setFormData({ name: '', email: '', message: '' });
       }
@@ -91,11 +106,35 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
 
       setSuccess(true);
 
+      // Close modal faster
       setTimeout(() => {
         setSuccess(false);
-        setFormData({ name: '', email: '', message: '' });
+        // Keep email prefilled when logged in for next message
+        if (isLoggedIn && user) {
+          setFormData((prev) => ({
+            ...prev,
+            message: '',
+          }));
+        } else {
+          // Keep registered user data prefilled
+          const registeredUser = localStorage.getItem('registeredUser');
+          if (registeredUser) {
+            try {
+              const userData = JSON.parse(registeredUser);
+              setFormData({
+                name: userData.fullName || '',
+                email: userData.email || '',
+                message: '',
+              });
+            } catch (e) {
+              setFormData({ name: '', email: '', message: '' });
+            }
+          } else {
+            setFormData({ name: '', email: '', message: '' });
+          }
+        }
         onClose();
-      }, 2500);
+      }, 200);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send message');
       setLoading(false);

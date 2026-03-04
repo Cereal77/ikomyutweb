@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import VerificationModal from '../components/VerificationModal';
 import '../styles/AuthPage.css';
 
 interface AuthPageProps {
@@ -19,35 +20,11 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [successLoading, setSuccessLoading] = useState(false);
   const [verificationStep, setVerificationStep] = useState(false);
-  const [verificationCode, setVerificationCode] = useState(['', '', '', '', '', '']);
-  const [resendTimer, setResendTimer] = useState(0);
   const { setUserFromBackend } = useAuth();
   // Use localhost for development, production URL for deployment
   const API_BASE = process.env.NODE_ENV === 'production' 
     ? 'https://ikomyutweb-4.onrender.com/api/auth'
     : 'http://localhost:5000/api/auth';
-
-  // Handle verification code input
-  const handleVerificationCodeChange = (index: number, value: string) => {
-    if (!/^\d*$/.test(value)) return; // Only allow digits
-    const newCode = [...verificationCode];
-    newCode[index] = value.slice(-1); // Keep only last character
-    setVerificationCode(newCode);
-
-    // Auto-focus next input
-    if (value && index < 5) {
-      const nextInput = document.getElementById(`code-${index + 1}`) as HTMLInputElement;
-      if (nextInput) nextInput.focus();
-    }
-  };
-
-  // Handle backspace in verification code
-  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !verificationCode[index] && index > 0) {
-      const prevInput = document.getElementById(`code-${index - 1}`) as HTMLInputElement;
-      if (prevInput) prevInput.focus();
-    }
-  };
 
   // Login handler
   const handleLogin = async (e: React.FormEvent) => {
@@ -124,167 +101,18 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Registration failed');
       
-      // Move to verification step
+      // Store registration data in localStorage for contact form auto-fill
+      localStorage.setItem('registeredUser', JSON.stringify({ fullName: name, email }));
+      
+      // Show verification modal
       setVerificationStep(true);
       setError('');
-      setResendTimer(30);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {
       setLoading(false);
     }
   };
-
-  const handleVerifyEmail = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    const code = verificationCode.join('');
-    
-    if (code.length !== 6) {
-      setError('Please enter the complete 6-digit code');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/verify-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, verificationCode: code }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Verification failed');
-      
-      setSuccessLoading(true);
-      setTimeout(() => {
-        setVerificationStep(false);
-        setTab('login');
-        setError('Email verified! You can now login.');
-        setMobileno('');
-        setPassword('');
-        setConfirmPassword('');
-        setName('');
-        setEmail('');
-        setVerificationCode(['', '', '', '', '', '']);
-        setSuccessLoading(false);
-      }, 2000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Verification failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResendCode = async () => {
-    if (resendTimer > 0) return;
-
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/resend-verification-code`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to resend code');
-      
-      setError('New code sent to your email');
-      setVerificationCode(['', '', '', '', '', '']);
-      setResendTimer(30);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to resend code');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Resend timer countdown
-  React.useEffect(() => {
-    if (resendTimer <= 0) return;
-    const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [resendTimer]);
-
-  // Show verification screen
-  if (verificationStep) {
-    return (
-      <div className="auth-split-page">
-        {successLoading && (
-          <div className="loading-overlay">
-            <div className="loading-content">
-              <div className="spinner"></div>
-              <p>Processing...</p>
-            </div>
-          </div>
-        )}
-        <div className="auth-split-card">
-          <div className="auth-split-left">
-            <div className="auth-logo-box">
-              <img src="/logowh.png" alt="iKomyutPH" className="auth-logo-large" />
-              <h1 className="ikom-title">iKomyut<span className="ikom-ph">PH</span></h1>
-            </div>
-          </div>
-          <div className="auth-split-right">
-            <div className="verification-container">
-              <h2>Verify Your Email</h2>
-              <p>Enter the 6-digit verification code we just sent to your email.</p>
-              
-              <form className="verification-form" onSubmit={handleVerifyEmail}>
-                <div className="verification-code-inputs">
-                  {verificationCode.map((digit, index) => (
-                    <input
-                      key={index}
-                      id={`code-${index}`}
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleVerificationCodeChange(index, e.target.value)}
-                      onKeyDown={(e) => handleKeyDown(index, e)}
-                      disabled={loading}
-                      className="verification-input"
-                    />
-                  ))}
-                </div>
-
-                {error && <div className="error-message">{error}</div>}
-                
-                <button type="submit" className="btn btn--primary auth-submit" disabled={loading}>
-                  {loading ? 'Verifying...' : 'Verify'}
-                </button>
-              </form>
-
-              <div className="resend-section">
-                <p>Didn't you receive any code? 
-                  <button
-                    type="button"
-                    className="resend-btn"
-                    onClick={handleResendCode}
-                    disabled={resendTimer > 0 || loading}
-                  >
-                    {resendTimer > 0 ? `Resend Code (${resendTimer}s)` : 'Resend Code'}
-                  </button>
-                </p>
-              </div>
-
-              <button
-                type="button"
-                className="back-btn"
-                onClick={() => {
-                  setVerificationStep(false);
-                  setTab('register');
-                  setError('');
-                }}
-                disabled={loading}
-              >
-                ← Back to Sign Up
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="auth-split-page">
@@ -451,6 +279,25 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
           )}
         </div>
       </div>
+
+      <VerificationModal
+        isOpen={verificationStep}
+        email={email}
+        onClose={() => {
+          setVerificationStep(false);
+          setTab('register');
+        }}
+        onSuccess={() => {
+          setVerificationStep(false);
+          setTab('login');
+          setError('Email verified! You can now login.');
+          setMobileno('');
+          setPassword('');
+          setConfirmPassword('');
+          setName('');
+          setEmail('');
+        }}
+      />
     </div>
   );
 };
