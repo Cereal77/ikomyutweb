@@ -107,14 +107,16 @@ const VerificationModal: React.FC<VerificationModalProps> = ({
     return () => clearTimeout(timer);
   }, [resendTimer]);
 
-  // Reset state when modal closes
+  // Reset state when modal closes and set timer when opens
   useEffect(() => {
     if (!isOpen) {
       setVerificationCode(['', '', '', '', '', '']);
       setError('');
       setResendTimer(0);
+      setLoading(false);
     } else {
-      setResendTimer(30); // Start resend timer when modal opens
+      // Only set timer once when modal opens (when resendTimer is 0)
+      setResendTimer((prev) => prev === 0 ? 30 : prev);
     }
   }, [isOpen]);
 

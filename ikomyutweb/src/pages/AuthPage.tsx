@@ -93,17 +93,26 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
     }
     setLoading(true);
     try {
+      console.log('🚀 Starting registration...');
+      const startTime = Date.now();
+      
       const res = await fetch(`${API_BASE}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fullName: name, email, mobileNo: mobilenumber, password }),
       });
+      
+      const apiTime = Date.now() - startTime;
+      console.log(`✅ API responded in ${apiTime}ms`);
+      
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Registration failed');
       
+      console.log('💾 Saving to localStorage...');
       // Store registration data in localStorage for contact form auto-fill
       localStorage.setItem('registeredUser', JSON.stringify({ fullName: name, email }));
       
+      console.log('🔓 Opening verification modal...');
       // Show verification modal
       setVerificationStep(true);
       setError('');
